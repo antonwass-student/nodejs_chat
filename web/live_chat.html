@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en" xmlns="http://java.sun.com/jsf/html">
+<head>
+    <meta charset="UTF-8">
+    <title>Chat</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.6.0/angular.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="main.css"/>
+
+</head>
+
+<body style="padding: 150px">
+    <div ng-app="myApp" ng-controller="chatWindow" style="width: 800px; margin: auto; display: block;" class="page_wrapper_content">
+        Connect to <button class="btn btn-default" type="submit" ng-click="connectTo('ws://localhost:8090')">Vert.x-server</button>
+        Connect to <button class="btn btn-default" type="submit" ng-click="connectTo('ws://localhost:8091')">node.js-server</button>
+        <div class="row">
+            <div style="position: fixed;bottom: 0px; right: 0px;">
+                <div class="col-sm-12" >
+                    <div  style="overflow-x: scroll;white-space: nowrap;">
+                        <div ng-repeat="c in conversations" style="display: inline-block;width: 300px;margin: 5px;background-color: aliceblue;">
+                            <table ng-if="c.open == true">
+                                <tr>
+                                    <td>
+                                        <form id="chat">
+                                            <div ng-click="closeConversation(c.conversation_id)" style="width: 300px;background-color: lightgreen;height: 30px">
+                                                <div style="display: inline">
+                                                        <div >
+                                                            <label  style="text-align: left; margin: 7px">{{c.namn}}
+                                                                <span class="glyphicon glyphicon-menu-down" style="align-content: right; margin-right: 2px"></span>
+                                                            </label>
+                                                        </div>
+                                                </div>
+                                            </div>
+                                            <div style=" height: 250px;overflow-y: scroll;">
+                                                <table style="width: inherit">
+                                                    <tr ng-repeat="msg in c.messages" >
+                                                        <td style="text-align: right;width: 300px">
+                                                            <div ng-if="msg.sender == userId" class="msgBubbleMe">
+                                                                <label style="margin: 2px" >{{msg.text}}</label>
+                                                            </div>
+                                                            <div ng-if="msg.sender != userId" >
+                                                                <div style="text-align: left;margin-left: 3px; color: darkgray;">
+                                                                    <label>{{msg.name}}</label>
+                                                                </div>
+                                                                <div class="msgBubbleOther">
+                                                                    <label style="margin: 2px">{{msg.text}}</label>
+                                                                </div>
+
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                </table>
+                                            </div>
+                                            <!-- Input -->
+                                            <div class="input-group" style="width: 300px;">
+                                                <input ng-model="c.input" class="form-control" type="text" placeholder="Your message..."/>
+                                                <div class="input-group-btn">
+                                                    <input class="btn btn-success" type="submit" value="Send!" ng-click="send(c.conversation_id)" />
+                                                </div>
+                                            </div>
+                                        </form>
+                                    </td>
+                                </tr>
+                            </table>
+                            <input ng-if="c.open == false" style="width: 100%;" class="btn btn-success" type="submit" value="{{c.namn}}" ng-click="getMessagesFrom(c.conversation_id)" />
+                        </div>
+                        <div style="display: inline-block;width: 300px;margin: 5px;background-color: aliceblue;">
+                            <div >
+                                <table>
+                                    <tr>
+                                        <td>
+                                            <div style="width: 300px;background-color: lightgreen;height: 30px">
+                                                <div style="display: inline">
+                                                    <div >
+                                                        <label  style="text-align: left; margin: 7px">Skapa ny chat </label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div style=" height: 250px;margin: 5px">
+                                                <div>
+                                                    Friends:
+                                                    <div class="dropdown">
+                                                        <button class="btn btn-default dropdown-toggle" type="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
+                                                            Friends to invite!
+                                                            <span class="caret"></span>
+                                                        </button>
+                                                        <ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
+                                                            <li ng-repeat="f in friends"><a href="" ng-click="appendFriendToNewConversation(f.user_id)">{{f.name}}</a></li>
+                                                        </ul>
+                                                    </div>
+                                                    <label ng-repeat="u in usersToAdd">{{getUserNameBy(u)}},</label>
+                                                    </br>
+                                                    Chat name:
+                                                    <div class="input-group" style="width: 100%">
+                                                        <input ng-model="newConv.name"  class="form-control" type="text" placeholder="Conversation name..." />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <input style="width: 100%" ng-click="createConversationBtnPressed()" class="btn btn-success" type="submit" value="Create conversation"/>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    </div>
+</body>
+
+<script type="text/javascript">
+
+    var app = angular.module('myApp', []);
+
+    app.controller('chatWindow', ['$scope',function($scope){
+        $scope.websocket = null;
+        $scope.userId = 3;
+        $scope.friends = [];
+        $scope.userInput = {
+            input:''
+        };
+        $scope.usersToAdd = []
+        $scope.testUsers = {
+            users: []
+        }
+        $scope.newConvName = {
+            name: ''
+        };
+        $scope.conversations = [];
+
+        $scope.connectTo = function(address) {
+            if ($scope.websocket != null){
+                console.log('Socket already busy, closing socket...')
+                $scope.websocket.close();
+            }
+            console.log("connecting...");
+            $scope.websocket = new WebSocket(address, 'live-chat');
+            $scope.websocket.onopen = $scope.onConnect;
+            $scope.websocket.onmessage = $scope.onMessage;
+            $scope.websocket.onclose = $scope.onClose;
+
+            console.log("connected!");
+        };
+
+        $scope.disconnect = function () {
+            $scope.websocket.close();
+            console.log("Socket closed.");
+        };
+
+        $scope.onClose = function (event) {
+            $scope.websocket.close();
+            console.log('Socket is closed.')
+        };
+
+        $scope.onConnect = function (event) {
+            $scope.getConversations();
+            $scope.getFriends();
+        };
+
+
+
+        $scope.send = function (chatId) {
+            var convInput = getConversationBy(chatId);
+            if (convInput.input != '' && convInput.input != null){
+                console.log('send msg to '+ chatId)
+                var jsonMsg = {
+                    type: "message",
+                    id: chatId,
+                    message: convInput.input,
+                    sender:$scope.userId
+                };
+                $scope.websocket.send(JSON.stringify(jsonMsg));
+                convInput.input = '';
+            }
+        };
+
+        $scope.getUserNameBy = function(id) {
+            var name = '';
+            $scope.friends.forEach(function (item, index) {
+                if (id == item.user_id){
+                    var namn = item.name;
+                    name =  namn.toString();
+                }
+            });
+            return name;
+        };
+
+        $scope.onMessage = function (evt) {
+            console.log('message incoming!!!!!!!!!!!!!!!!!!!');
+            var msg = JSON.parse(evt.data);
+            console.log(msg.type);
+            switch (msg.type) {
+                case 'message':
+                    console.log('type = single message');
+
+                    var convId = msg.id;
+                    console.log('convId = '+ convId)
+                    $scope.conversations.forEach(function (item,index) {
+                        if (convId == item.conversation_id ){
+                            console.log('message content : ' + msg.message)
+                            var name = $scope.getUserNameBy(msg.sender);
+                            console.log('sender name = ' +name);
+                            item.messages.push({text:msg.message,sender: msg.sender, name: name });
+                        }
+                    });
+                    $scope.$apply();
+                    break;
+                case 'messages':
+                    console.log('inne i messages');
+
+                    if (msg.messages.length > 0){
+                        var receiverId = msg.messages[0].receiver;
+                        // Append message to correct conversation.
+                        $scope.conversations.forEach(function (item,index) {
+                            if (receiverId == item.conversation_id ){
+                                item.messages = msg.messages;
+                                console.log(item.messages.length)
+                            }
+                        });
+                        $scope.$apply();
+                    }
+                    break;
+                case 'conversations':
+                    console.log('type = conversation');
+                    $scope.conversations = [];
+                    msg.conversations.forEach(function (item,key) {
+                       var c = {
+                           conversation_id:item.conversation_id,
+                           namn:item.namn,
+                           messages:[],
+                           open: false,
+                           input: ''
+                       };
+                        $scope.conversations.push(c);
+                    });
+
+                    $scope.$apply();
+
+                    break;
+                case 'friends':
+                    console.log('type = friends');
+                    $scope.friends = [];
+                    msg.friends.forEach(function (item,key) {
+                        var f = {
+                            name: item.name,
+                            user_id: item.user_id
+                        }
+                        $scope.friends.push(f);
+                    });
+                    $scope.$apply();
+                    break;
+                default:
+                    console.log("default... we don't know how to handle this...");
+                    break;
+            }
+        };
+
+        $scope.closeConversation = function (convId) {
+            setConversationStatus(convId,false);
+        };
+
+        $scope.getFriends = function () {
+            var jsonMsg = {type:'friends',id:$scope.userId};
+            $scope.websocket.send(JSON.stringify(jsonMsg));
+        };
+
+        $scope.getConversations = function () {
+            var jsonMsg = {type: 'conversations', user: $scope.userId};
+            $scope.websocket.send(JSON.stringify(jsonMsg));
+        };
+
+        $scope.getMessagesFrom = function (conversationId) {
+            var jsonMsg = {
+                type: 'openConversation',
+                id: conversationId
+            };
+            console.log('Get messages from convId = ' + conversationId)
+            $scope.websocket.send(JSON.stringify(jsonMsg));
+            setConversationStatus(conversationId,true);
+        };
+
+        function setConversationStatus(id, close) {
+            $scope.conversations.forEach(function (item,index) {
+                if (id == item.conversation_id){
+                     item.open = close;
+                }
+            });
+        }
+        function getConversationBy(id) {
+            var conv;
+            $scope.conversations.forEach(function (item,index) {
+                if (id == item.conversation_id){
+                    conv = item;
+                }
+            });
+            return conv;
+        }
+        $scope.createConversationBtnPressed = function () {
+            if ($scope.usersToAdd.length > 0 && $scope.newConv.name != ''){
+                $scope.createConversation($scope.newConv.name,$scope.usersToAdd)
+            }
+
+        };
+
+        $scope.appendFriendToNewConversation = function (friendId) {
+            $scope.usersToAdd.push(friendId);
+            $scope.testUsers.users = $scope.usersToAdd
+            console.log(friendId + 'was added to newConvList')
+        };
+
+        $scope.createConversation = function (name,who) {
+            who.push($scope.userId);
+            var jsonMsg = {
+                type: 'new',
+                name: name,
+                sender: $scope.userId,
+                members: who
+            };
+            $scope.websocket.send(JSON.stringify(jsonMsg));
+            $scope.usersToAdd = [];
+            $scope.newConv.name = '';
+        };
+
+        $scope.inviteToConversation = function (convId,who) {
+            var jsonMsg = {
+                type: 'invited',
+                convId: convId,
+                sender: $scope.userId,
+                who: who
+            };
+            $scope.websocket.send(JSON.stringify(jsonMsg));
+        };
+
+        // On ready
+        angular.element(document).ready(function () {
+            $scope.userId = 3;// SÄTT ID!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        });
+    }]);
+
+</script>
+
+</html>
