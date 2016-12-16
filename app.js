@@ -76,14 +76,21 @@ wsServer.on('request', function(request){
                             type:'messages',
                             messages:result
                         };
-
+                        console.dir(response);
                         connection.sendUTF(JSON.stringify(response));
                    });
 
                    break;
                case 'new':
-                   console.log("hej");
-                    database.addNewConversation(msg.members, msg.name);
+                   console.dir(msg);
+                    database.addNewConversation(msg.members, msg.name, function(id, name){
+                        var response = {
+                            type:'newConversation',
+                            namn:name,
+                            conversation_id:id
+                        }
+                        connection.sendUTF(JSON.stringify(response));
+                    });
                    break;
 
                case 'invite':

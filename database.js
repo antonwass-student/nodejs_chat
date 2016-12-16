@@ -36,7 +36,8 @@ var getMessagesFromConversation = function(convId, callback){
 
         var request = new sql.Request();
 
-        var query = "SELECT * FROM Message WHERE receiver = @convId";
+        var query = "SELECT sent,text,user_id,name,receiver FROM Message " +
+            "INNER JOIN Usr ON sender = Usr.user_id WHERE receiver = @convId";
 
         request.input('convId', sql.Int(), convId);
 
@@ -87,7 +88,7 @@ var getFriendsByUser =function(userId, callback){
         });
     };
 
-var addNewConversation = function(members, name){
+var addNewConversation = function(members, name, callback){
             var request = new sql.Request();
 
             var query = "INSERT INTO Conversation (namn) VALUES(@name);SELECT SCOPE_IDENTITY() AS id;";
@@ -97,6 +98,8 @@ var addNewConversation = function(members, name){
             request.query(query).then(function(recordset){
 
                 console.dir(recordset[0].id);
+
+                callback(recordset[0].id, name);
 
                 addMembersToConversation(recordset[0].id, members)
 
